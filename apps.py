@@ -7,6 +7,9 @@ from datetime import datetime, timedelta
 import io
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import PolynomialFeatures
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 # Set page config for better appearance
 st.set_page_config(
@@ -255,98 +258,157 @@ if df is not None:
     # Main dashboard
     # Key metrics
     st.markdown('<h2 class="section-header">📈 Key Performance Metrics</h2>', unsafe_allow_html=True)
-    
+
     # Calculate fee percentage
     total_settlement = filtered_df["Total settlement amount"].sum()
     total_fees = filtered_df["Total fees"].sum()
     fee_percentage = 0
     if total_settlement != 0:
         fee_percentage = abs(total_fees / total_settlement) * 100
-    
-    col1, col2, col3, col4, col5 = st.columns(5)
-    
+
+    # Improved layout for PC - 3 columns with better spacing
+    col1, col2, col3 = st.columns([1, 1, 1])
+
     with col1:
         st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.markdown('<div class="metric-label">Total Revenue</div>', unsafe_allow_html=True)
+        st.markdown('<div class="metric-label">💰 Total Revenue</div>', unsafe_allow_html=True)
         st.markdown(f'<div class="metric-value">{format_rupiah(filtered_df["Total revenue"].sum())}</div>', unsafe_allow_html=True)
-        st.markdown('<div class="metric-description">Gross income from sales</div>', unsafe_allow_html=True)
+        st.markdown('<div class="metric-description">Gross income from all sales</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
-    
+
+        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
+        st.markdown('<div class="metric-label">📦 Total Orders</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-value">{format_number(len(filtered_df))}</div>', unsafe_allow_html=True)
+        st.markdown('<div class="metric-description">Number of transactions</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
     with col2:
         st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.markdown('<div class="metric-label">Total Settlement</div>', unsafe_allow_html=True)
+        st.markdown('<div class="metric-label">💳 Total Settlement</div>', unsafe_allow_html=True)
         st.markdown(f'<div class="metric-value">{format_rupiah(total_settlement)}</div>', unsafe_allow_html=True)
         st.markdown('<div class="metric-description">Net amount settled to account</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
-    
+
+        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
+        st.markdown('<div class="metric-label">💵 Average Order Value</div>', unsafe_allow_html=True)
+        avg_order_value = filtered_df["Total revenue"].mean()
+        st.markdown(f'<div class="metric-value">{format_rupiah(avg_order_value)}</div>', unsafe_allow_html=True)
+        st.markdown('<div class="metric-description">Revenue per transaction</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
     with col3:
         st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.markdown('<div class="metric-label">Total Fees</div>', unsafe_allow_html=True)
+        st.markdown('<div class="metric-label">💸 Total Fees</div>', unsafe_allow_html=True)
         st.markdown(f'<div class="metric-value">{format_rupiah(total_fees)}</div>', unsafe_allow_html=True)
         st.markdown('<div class="metric-description">All platform and service fees</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
-    
-    with col4:
+
         st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.markdown('<div class="metric-label">Fee Percentage</div>', unsafe_allow_html=True)
+        st.markdown('<div class="metric-label">📊 Fee Percentage</div>', unsafe_allow_html=True)
         st.markdown(f'<div class="metric-value">{format_percentage(fee_percentage)}</div>', unsafe_allow_html=True)
         st.markdown('<div class="metric-description">Fees as % of settlement</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
     
-    with col5:
-        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.markdown('<div class="metric-label">Total Orders</div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="metric-value">{format_number(len(filtered_df))}</div>', unsafe_allow_html=True)
-        st.markdown('<div class="metric-description">Number of transactions</div>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-    
     # Revenue breakdown
+    st.markdown('---')  # Add separator
     st.markdown('<h2 class="section-header">💰 Revenue Analysis</h2>', unsafe_allow_html=True)
     
-    # Revenue trend chart
-    st.markdown('<h3 class="subsection-header">Revenue Trend Over Time</h3>', unsafe_allow_html=True)
+    # Revenue trend chart - Interactive Plotly version
+    st.markdown('<h3 class="subsection-header">📈 Revenue Trend Over Time</h3>', unsafe_allow_html=True)
     with st.container():
         st.markdown('<div class="chart-container">', unsafe_allow_html=True)
         if not filtered_df.empty:
-            revenue_over_time = filtered_df.groupby(filtered_df['Order created time(UTC)'].dt.date)['Total revenue'].sum()
-            fig, ax = plt.subplots(figsize=(12, 6))
-            ax.plot(revenue_over_time.index, revenue_over_time.values, marker='o', linewidth=2, markersize=6, color='#1f77b4')
-            ax.set_xlabel("Date")
-            ax.set_ylabel("Revenue (IDR)")
-            ax.grid(True, alpha=0.3)
-            # Format y-axis as Rupiah
-            ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'IDR {x:,.0f}'.replace(',', '.')))
-            plt.xticks(rotation=45)
-            st.pyplot(fig)
+            revenue_over_time = filtered_df.groupby(filtered_df['Order created time(UTC)'].dt.date)['Total revenue'].sum().reset_index()
+            revenue_over_time.columns = ['Date', 'Revenue']
+
+            # Create interactive Plotly chart
+            fig = go.Figure()
+
+            # Add main line with gradient effect
+            fig.add_trace(go.Scatter(
+                x=revenue_over_time['Date'],
+                y=revenue_over_time['Revenue'],
+                mode='lines+markers',
+                name='Daily Revenue',
+                line=dict(color='#1f77b4', width=4),
+                marker=dict(size=8, color='#1f77b4', line=dict(width=2, color='white')),
+                hovertemplate='<b>Date:</b> %{x}<br><b>Revenue:</b> IDR %{y:,.0f}<extra></extra>'
+            ))
+
+            # Add area fill with gradient
+            fig.add_trace(go.Scatter(
+                x=revenue_over_time['Date'],
+                y=revenue_over_time['Revenue'],
+                fill='tozeroy',
+                fillcolor='rgba(31, 119, 180, 0.1)',
+                line=dict(width=0),
+                showlegend=False,
+                hoverinfo='skip'
+            ))
+
+            # Update layout with modern styling
+            fig.update_layout(
+                title=dict(
+                    text="📈 Interactive Revenue Trend",
+                    font=dict(size=20, color='#1f77b4'),
+                    x=0.5
+                ),
+                xaxis=dict(
+                    title="Date",
+                    showgrid=True,
+                    gridcolor='rgba(0,0,0,0.1)'
+                ),
+                yaxis=dict(
+                    title="Revenue (IDR)",
+                    tickformat=',.0f',
+                    tickprefix='IDR ',
+                    showgrid=True,
+                    gridcolor='rgba(0,0,0,0.1)'
+                ),
+                hovermode='x unified',
+                plot_bgcolor='white',
+                paper_bgcolor='white',
+                height=500,
+                margin=dict(l=50, r=50, t=80, b=50)
+            )
+
+            st.plotly_chart(fig, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
     
     # Order breakdown
+    st.markdown('---')  # Add separator
     st.markdown('<h2 class="section-header">📦 Order Analysis</h2>', unsafe_allow_html=True)
-    
+
     # Adjust affiliate_orders and direct_orders based on Affiliate commission logic
     affiliate_orders = filtered_df[filtered_df['Affiliate commission'].fillna(0) < 0]
     direct_orders = filtered_df[filtered_df['Affiliate commission'].fillna(0) == 0]
-    
-    # Order metrics
-    col1, col2, col3 = st.columns(3)
-    
+
+    # Order metrics - improved layout
+    col1, col2 = st.columns([1, 1])
+
     with col1:
         st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.markdown('<div class="metric-label">Affiliate Orders</div>', unsafe_allow_html=True)
+        st.markdown('<div class="metric-label">🤝 Affiliate Orders</div>', unsafe_allow_html=True)
         st.markdown(f'<div class="metric-value">{format_number(len(affiliate_orders))}</div>', unsafe_allow_html=True)
         st.markdown('<div class="metric-description">Orders through affiliate links</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
-    
+
+        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
+        st.markdown('<div class="metric-label">💰 Affiliate Revenue</div>', unsafe_allow_html=True)
+        affiliate_revenue = affiliate_orders['Total revenue'].sum()
+        st.markdown(f'<div class="metric-value">{format_rupiah(affiliate_revenue)}</div>', unsafe_allow_html=True)
+        st.markdown('<div class="metric-description">Revenue from affiliate orders</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
     with col2:
         st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.markdown('<div class="metric-label">Direct Store Orders</div>', unsafe_allow_html=True)
+        st.markdown('<div class="metric-label">🏪 Direct Store Orders</div>', unsafe_allow_html=True)
         st.markdown(f'<div class="metric-value">{format_number(len(direct_orders))}</div>', unsafe_allow_html=True)
         st.markdown('<div class="metric-description">Direct customer purchases</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
-    
-    with col3:
+
         st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.markdown('<div class="metric-label">Affiliate Ratio</div>', unsafe_allow_html=True)
+        st.markdown('<div class="metric-label">📊 Affiliate Ratio</div>', unsafe_allow_html=True)
         if len(filtered_df) > 0:
             affiliate_ratio = len(affiliate_orders) / len(filtered_df) * 100
             st.markdown(f'<div class="metric-value">{format_percentage(affiliate_ratio)}</div>', unsafe_allow_html=True)
@@ -355,39 +417,108 @@ if df is not None:
         st.markdown('<div class="metric-description">Percentage of affiliate orders</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
     
-    # Order type revenue comparison
-    st.markdown('<h3 class="subsection-header">Revenue by Order Type</h3>', unsafe_allow_html=True)
+    # Order type revenue comparison - Interactive Plotly version
+    st.markdown('<h3 class="subsection-header">💰 Revenue by Order Type</h3>', unsafe_allow_html=True)
     with st.container():
         st.markdown('<div class="chart-container">', unsafe_allow_html=True)
         if not affiliate_orders.empty or not direct_orders.empty:
-            fig, ax = plt.subplots(figsize=(10, 6))
             order_types = ['Affiliate Orders', 'Direct Store Orders']
             revenues = [affiliate_orders['Total revenue'].sum(), direct_orders['Total revenue'].sum()]
-            bars = ax.bar(order_types, revenues, color=['#d62728', '#2ca02c'])
-            ax.set_ylabel("Revenue (IDR)")
-            ax.set_title("Revenue by Order Type")
-            # Format y-axis as Rupiah
-            ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'IDR {x:,.0f}'.replace(',', '.')))
-            # Add value labels on bars
-            for bar in bars:
-                height = bar.get_height()
-                ax.annotate(format_rupiah(height),
-                            xy=(bar.get_x() + bar.get_width() / 2, height),
-                            xytext=(0, 3),
-                            textcoords="offset points",
-                            ha='center', va='bottom', fontsize=10)
-            st.pyplot(fig)
+
+            # Create interactive bar chart
+            fig = go.Figure()
+
+            # Add bars with custom colors and effects
+            colors = ['#d62728', '#2ca02c']
+            for i, (order_type, revenue) in enumerate(zip(order_types, revenues)):
+                fig.add_trace(go.Bar(
+                    x=[order_type],
+                    y=[revenue],
+                    name=order_type,
+                    marker_color=colors[i],
+                    marker_line_color='black',
+                    marker_line_width=1,
+                    hovertemplate='<b>%{x}</b><br>Revenue: IDR %{y:,.0f}<extra></extra>',
+                    showlegend=False
+                ))
+
+            # Calculate percentages
+            total_rev = sum(revenues)
+            percentages = [(revenue / total_rev) * 100 if total_rev > 0 else 0 for revenue in revenues]
+
+            # Add percentage annotations
+            for i, (order_type, revenue, percentage) in enumerate(zip(order_types, revenues, percentages)):
+                fig.add_annotation(
+                    x=order_type,
+                    y=revenue / 2,
+                    text=f'{percentage:.1f}%',
+                    showarrow=False,
+                    font=dict(size=12, color='white', weight='bold'),
+                    xanchor='center',
+                    yanchor='middle'
+                )
+
+                # Add value labels above bars
+                fig.add_annotation(
+                    x=order_type,
+                    y=revenue,
+                    text=format_rupiah(revenue),
+                    showarrow=False,
+                    font=dict(size=11, color=colors[i], weight='bold'),
+                    xanchor='center',
+                    yanchor='bottom',
+                    yshift=5
+                )
+
+            # Update layout
+            fig.update_layout(
+                title=dict(
+                    text="💰 Revenue Comparison: Affiliate vs Direct Orders",
+                    font=dict(size=18, color='#1f77b4'),
+                    x=0.5
+                ),
+                xaxis=dict(
+                    title="Order Type",
+                    showgrid=False
+                ),
+                yaxis=dict(
+                    title="Revenue (IDR)",
+                    tickformat=',.0f',
+                    tickprefix='IDR ',
+                    showgrid=True,
+                    gridcolor='rgba(0,0,0,0.1)'
+                ),
+                plot_bgcolor='white',
+                paper_bgcolor='white',
+                height=500,
+                margin=dict(l=50, r=50, t=80, b=50)
+            )
+
+            st.plotly_chart(fig, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
     
-    # Fee breakdown
-    st.markdown('<h2 class="section-header">💸 Fee Breakdown</h2>', unsafe_allow_html=True)
-    
-    # Fee metrics
-    st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-    st.markdown('<div class="metric-label">Total Fees</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="metric-value">{format_rupiah(total_fees)}</div>', unsafe_allow_html=True)
-    st.markdown('<div class="metric-description">All platform and service fees combined</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+    # Fee breakdown - improved layout
+    st.markdown('---')  # Add separator
+    st.markdown('<h2 class="section-header">💸 Fee Analysis</h2>', unsafe_allow_html=True)
+
+    # Fee overview metrics
+    col1, col2 = st.columns([1, 1])
+
+    with col1:
+        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
+        st.markdown('<div class="metric-label">💸 Total Fees</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-value">{format_rupiah(total_fees)}</div>', unsafe_allow_html=True)
+        st.markdown('<div class="metric-description">All platform and service fees combined</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with col2:
+        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
+        st.markdown('<div class="metric-label">📊 Fee Efficiency</div>', unsafe_allow_html=True)
+        total_revenue = filtered_df['Total revenue'].sum()
+        fee_efficiency = (abs(total_fees) / total_revenue) * 100 if total_revenue != 0 else 0
+        st.markdown(f'<div class="metric-value">{format_percentage(fee_efficiency)}</div>', unsafe_allow_html=True)
+        st.markdown('<div class="metric-description">Fees as % of total revenue</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
     
     # Specific fee breakdown
     fee_breakdown_cols = [
@@ -414,22 +545,32 @@ if df is not None:
         # Format the amounts as Rupiah
         fee_df['Total Amount (IDR)'] = fee_df['Total Amount'].apply(format_rupiah)
         
-        # Fee breakdown chart
-        st.markdown('<h3 class="subsection-header">Fee Composition</h3>', unsafe_allow_html=True)
+        # Fee breakdown chart - enhanced
+        st.markdown('<h3 class="subsection-header">📊 Fee Composition Breakdown</h3>', unsafe_allow_html=True)
         with st.container():
             st.markdown('<div class="chart-container">', unsafe_allow_html=True)
             # Create a pie chart for fee breakdown
             if len(existing_fee_breakdown_cols) > 1:
-                fig, ax = plt.subplots(figsize=(10, 8))
+                fig, ax = plt.subplots(figsize=(12, 10))  # Larger for PC
                 # Take absolute values for the pie chart
                 fee_values = [abs(fee_totals[col]) for col in existing_fee_breakdown_cols]
                 colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b']
-                wedges, texts, autotexts = ax.pie(fee_values, labels=existing_fee_breakdown_cols, autopct='%1.1f%%', startangle=90, colors=colors)
+                wedges, texts, autotexts = ax.pie(fee_values, labels=existing_fee_breakdown_cols,
+                                                  autopct='%1.1f%%', startangle=90, colors=colors,
+                                                  textprops={'fontsize': 10, 'fontweight': 'bold'})
                 ax.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle
+                ax.set_title("Fee Distribution by Type", fontsize=14, fontweight='bold', pad=20)
+
                 # Improve label styling
                 for autotext in autotexts:
                     autotext.set_color('white')
                     autotext.set_fontweight('bold')
+                    autotext.set_fontsize(9)
+
+                # Add legend with values
+                legend_labels = [f'{col}\n{format_rupiah(abs(fee_totals[col]))}' for col in existing_fee_breakdown_cols]
+                ax.legend(wedges, legend_labels, title="Fee Types", loc="center left", bbox_to_anchor=(1, 0, 0.5, 1))
+
                 st.pyplot(fig)
             st.markdown('</div>', unsafe_allow_html=True)
         
@@ -442,38 +583,70 @@ if df is not None:
     else:
         st.info("No specific fee data available in the current dataset.")
     
-    # Data tables
-    st.markdown('<h2 class="section-header">📋 Detailed Data</h2>', unsafe_allow_html=True)
-    
-    # Summary statistics
-    st.markdown('<h3 class="subsection-header">Summary Statistics</h3>', unsafe_allow_html=True)
-    with st.container():
-        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-        numeric_columns = filtered_df.select_dtypes(include=[np.number]).columns.tolist()
-        summary_stats = filtered_df[numeric_columns].describe()
-        
-        # Format the summary statistics with Rupiah for monetary values
-        for col in summary_stats.columns:
-            if 'revenue' in col.lower() or 'fee' in col.lower() or 'amount' in col.lower() or 'payment' in col.lower():
-                summary_stats[col] = summary_stats[col].apply(format_rupiah)
-            elif 'order/adjustment id' in col.lower() or 'id' in col.lower():
-                # Format IDs without thousand separators
-                summary_stats[col] = summary_stats[col].apply(format_id)
-            else:
-                summary_stats[col] = summary_stats[col].apply(format_number)
-        
-        st.dataframe(summary_stats, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    # Raw data
-    st.markdown('<h3 class="subsection-header">Raw Data</h3>', unsafe_allow_html=True)
-    with st.container():
-        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-        st.dataframe(df_display, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+    # Data tables - improved organization
+    st.markdown('---')  # Add separator
+    st.markdown('<h2 class="section-header">📋 Detailed Data & Statistics</h2>', unsafe_allow_html=True)
+
+    # Create tabs for better organization
+    tab1, tab2, tab3 = st.tabs(["📊 Summary Statistics", "📋 Raw Data", "🔍 Data Insights"])
+
+    with tab1:
+        st.markdown('<h3 class="subsection-header">Statistical Overview</h3>', unsafe_allow_html=True)
+        with st.container():
+            st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+            numeric_columns = filtered_df.select_dtypes(include=[np.number]).columns.tolist()
+            summary_stats = filtered_df[numeric_columns].describe()
+
+            # Format the summary statistics with Rupiah for monetary values
+            for col in summary_stats.columns:
+                if 'revenue' in col.lower() or 'fee' in col.lower() or 'amount' in col.lower() or 'payment' in col.lower():
+                    summary_stats[col] = summary_stats[col].apply(format_rupiah)
+                elif 'order/adjustment id' in col.lower() or 'id' in col.lower():
+                    # Format IDs without thousand separators
+                    summary_stats[col] = summary_stats[col].apply(format_id)
+                else:
+                    summary_stats[col] = summary_stats[col].apply(format_number)
+
+            st.dataframe(summary_stats, use_container_width=True, height=400)
+            st.markdown('</div>', unsafe_allow_html=True)
+
+    with tab2:
+        st.markdown('<h3 class="subsection-header">Complete Transaction Data</h3>', unsafe_allow_html=True)
+        with st.container():
+            st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+            st.dataframe(df_display, use_container_width=True, height=500)
+            st.markdown('</div>', unsafe_allow_html=True)
+
+    with tab3:
+        st.markdown('<h3 class="subsection-header">Quick Data Insights</h3>', unsafe_allow_html=True)
+        with st.container():
+            st.markdown('<div class="insight-card">', unsafe_allow_html=True)
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.markdown('<div class="insight-item">', unsafe_allow_html=True)
+                st.write(f"📅 Date Range: {filtered_df['Order created time(UTC)'].min().date()} to {filtered_df['Order created time(UTC)'].max().date()}")
+                st.markdown('</div>', unsafe_allow_html=True)
+
+                st.markdown('<div class="insight-item">', unsafe_allow_html=True)
+                st.write(f"🔢 Total Records: {format_number(len(filtered_df))}")
+                st.markdown('</div>', unsafe_allow_html=True)
+
+            with col2:
+                st.markdown('<div class="insight-item">', unsafe_allow_html=True)
+                st.write(f"💰 Highest Order: {format_rupiah(filtered_df['Total revenue'].max())}")
+                st.markdown('</div>', unsafe_allow_html=True)
+
+                st.markdown('<div class="insight-item">', unsafe_allow_html=True)
+                st.write(f"📉 Lowest Order: {format_rupiah(filtered_df['Total revenue'].min())}")
+                st.markdown('</div>', unsafe_allow_html=True)
+
+            st.markdown('</div>', unsafe_allow_html=True)
     
     # Advanced insights
+    st.markdown('---')  # Add separator
     st.markdown('<h2 class="section-header">💡 Advanced Insights</h2>', unsafe_allow_html=True)
+    st.markdown('<p style="font-size: 16px; color: #666; margin-bottom: 20px;">AI-powered analysis and strategic recommendations for your business</p>', unsafe_allow_html=True)
     
     # Revenue insights
     with st.container():
@@ -677,7 +850,94 @@ if df is not None:
             
         st.markdown('</div>', unsafe_allow_html=True)
     
+    # Advanced Visualizations section
+    st.markdown('---')  # Add separator
+    st.markdown('<h2 class="ai-header">🎨 Advanced Visualizations</h2>', unsafe_allow_html=True)
+    st.markdown('<p style="font-size: 16px; color: #666; margin-bottom: 20px; text-align: center;">Interactive and animated charts for deeper insights</p>', unsafe_allow_html=True)
+
+    # Animated revenue trend
+    with st.container():
+        st.markdown('<div class="insight-card">', unsafe_allow_html=True)
+        st.markdown('<div class="ai-subheader">📊 Animated Revenue Timeline</div>', unsafe_allow_html=True)
+
+        if not filtered_df.empty and len(filtered_df) > 3:
+            # Prepare animated data
+            daily_revenue = filtered_df.groupby(filtered_df['Order created time(UTC)'].dt.date)['Total revenue'].sum()
+            daily_orders = filtered_df.groupby(filtered_df['Order created time(UTC)'].dt.date).size()
+
+            daily_data = pd.DataFrame({
+                'Date': daily_revenue.index,
+                'Revenue': daily_revenue.values,
+                'Order_Count': daily_orders.values
+            })
+            daily_data = daily_data.sort_values('Date')
+
+            # Create animated scatter plot
+            fig = px.scatter(daily_data,
+                           x='Date',
+                           y='Revenue',
+                           size='Order_Count',
+                           color='Revenue',
+                           color_continuous_scale='Blues',
+                           size_max=50,
+                           title='🎯 Revenue vs Order Volume Over Time',
+                           labels={'Revenue': 'Total Revenue (IDR)', 'Order_Count': 'Number of Orders'})
+
+            fig.update_traces(
+                hovertemplate='<b>Date:</b> %{x}<br><b>Revenue:</b> IDR %{y:,.0f}<br><b>Orders:</b> %{marker.size}<extra></extra>'
+            )
+
+            fig.update_layout(
+                height=500,
+                coloraxis_colorbar=dict(title="Revenue Scale"),
+                plot_bgcolor='white',
+                paper_bgcolor='white'
+            )
+
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("Need more data points for animated visualization.")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # 3D visualization
+    with st.container():
+        st.markdown('<div class="insight-card">', unsafe_allow_html=True)
+        st.markdown('<div class="ai-subheader">🌟 3D Revenue Analysis</div>', unsafe_allow_html=True)
+
+        if not filtered_df.empty and len(filtered_df) > 10:
+            # Create 3D scatter plot
+            sample_data = filtered_df.sample(min(100, len(filtered_df)))  # Sample for performance
+
+            fig = px.scatter_3d(sample_data,
+                              x='Total revenue',
+                              y='Total fees',
+                              z=sample_data['Order created time(UTC)'].dt.dayofyear,
+                              color='Total revenue',
+                              color_continuous_scale='Viridis',
+                              title='🎲 3D Revenue, Fees & Time Analysis',
+                              labels={
+                                  'Total revenue': 'Revenue (IDR)',
+                                  'Total fees': 'Fees (IDR)',
+                                  'z': 'Day of Year'
+                              })
+
+            fig.update_layout(
+                height=600,
+                scene=dict(
+                    xaxis_title='Revenue',
+                    yaxis_title='Fees',
+                    zaxis_title='Time (Day of Year)'
+                ),
+                margin=dict(l=0, r=0, t=40, b=0)
+            )
+
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("Need more data for 3D visualization.")
+        st.markdown('</div>', unsafe_allow_html=True)
+
     # AI Analytics section
+    st.markdown('---')  # Add separator
     st.markdown('<h2 class="ai-header">🤖 AI-Powered Analytics</h2>', unsafe_allow_html=True)
     
     # Predictive analytics
@@ -778,14 +1038,26 @@ if df is not None:
                 # Calculate correlation matrix
                 corr_matrix = filtered_df[relevant_cols].corr()
                 
-                # Create correlation heatmap
-                fig, ax = plt.subplots(figsize=(10, 8))
-                sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', center=0, 
-                           square=True, linewidths=0.5, cbar_kws={"shrink": .8})
-                ax.set_title("Correlation Matrix of Key Metrics")
-                plt.xticks(rotation=45, ha='right')
-                plt.yticks(rotation=0)
-                st.pyplot(fig)
+                # Create interactive correlation heatmap
+                fig = px.imshow(corr_matrix,
+                              text_auto='.2f',
+                              aspect="auto",
+                              color_continuous_scale='RdBu_r',
+                              title="🔗 Interactive Correlation Matrix")
+
+                fig.update_layout(
+                    height=600,
+                    coloraxis_colorbar=dict(title="Correlation"),
+                    plot_bgcolor='white',
+                    paper_bgcolor='white'
+                )
+
+                # Add hover template
+                fig.update_traces(
+                    hovertemplate='<b>%{x}</b> vs <b>%{y}</b><br>Correlation: %{z:.3f}<extra></extra>'
+                )
+
+                st.plotly_chart(fig, use_container_width=True)
                 
                 # Key correlation insights
                 st.markdown('<div class="insight-item">', unsafe_allow_html=True)
