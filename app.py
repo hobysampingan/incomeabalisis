@@ -875,7 +875,7 @@ if df is not None:
             )
             
             # Calculate segment statistics
-            segment_stats = filtered_df.groupby('Revenue_Segment').agg({
+            segment_stats = filtered_df.groupby('Revenue_Segment', observed=True).agg({
                 'Total revenue': ['count', 'mean', 'sum']
             }).round(2)
             
